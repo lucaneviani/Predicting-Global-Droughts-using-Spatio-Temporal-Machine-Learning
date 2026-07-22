@@ -4,115 +4,103 @@ import lightgbm as lgb
 from sklearn.model_selection import GroupKFold
 from sklearn.metrics import root_mean_squared_error
 import warnings
+
 warnings.filterwarnings('ignore')
 
-def main():
-    print("1. Loading data...")
-    train_path = "Train (1).csv"
-    test_path = "Test.csv"
-    sub_path = "SampleSubmission.csv"
-    
-    train = pd.read_csv(train_path)
-    test = pd.read_csv(test_path)
-    sub = pd.read_csv(sub_path)
-    
-    print("2. Spatio-Temporal Data Cleaning & Missing Value Handling...")
-    train['time'] = pd.to_datetime(train['time'])
-    test['time'] = pd.to_datetime(test['time'])
-    
-    # We need a group for our out-of-time cross-validation
-    train['year_month'] = train['time'].dt.year.astype(str) + '_' + train['time'].dt.month.astype(str)
-    
-    # Handle missing targets in the test set via Spatial Forward Fill
-    # This assumes water levels change gradually in a specific geographic coordinate
-    test = test.sort_values(by=['lat', 'lon', 'time'])
-    test['TWS_t'] = test.groupby(['lat', 'lon'])['TWS_t'].ffill()
-    test['TWS_t'] = test['TWS_t'].fillna(0) # Fallback for extreme cases
-    
-    print("3. Feature Engineering...")
-    for df in [train, test]:
-        # Seasonality
-        df['month'] = df['time'].dt.month
-        
-        # Drought Momentum: Difference between 1-month and 3-month precipitation indices
-        # Captures whether the area is actively drying or getting wetter
-        df['drought_momentum_1_3'] = df['SPEI_01_t'] - df['SPEI_03_t']
-        
-        # Surface vs Groundwater interaction
-        df['water_soil_diff'] = df['TWS_t'] - df['SOIL_MOISTURE_t']
-        
-    features = [
-        'lat', 'lon', 'month',
-        'TWS_t', 'SOIL_MOISTURE_t',
-        'SPEI_01_t', 'SPEI_03_t', 'SPEI_06_t', 'SPEI_12_t',
-        'drought_momentum_1_3', 'water_soil_diff'
-    ]
-    
-    print("4. Out-of-Time Cross-Validation & Modeling...")
-    # GroupKFold ensures that all data from a specific month ends up in either train or validation, 
-    # never both, simulating a true forecasting scenario.
-    gkf = GroupKFold(n_splits=5)
-    
-    test_preds = np.zeros(len(test))
-    oof_rmse_scores = []
-    
-    # We'll use a standard but robust configuration for LightGBM
-    lgb_params = {
-        'objective': 'regression',
-        'metric': 'rmse',
-        'learning_rate': 0.05,
-        'n_estimators': 800,
-        'max_depth': 8,
-        'num_leaves': 64,
-        'subsample': 0.8,
-        'colsample_bytree': 0.8,
-        'random_state': 42,
-        'n_jobs': -1
-    }
-    
-    for fold, (train_idx, valid_idx) in enumerate(gkf.split(train, train['target'], train['year_month'])):
-        print(f"--- Training Fold {fold+1} ---")
-        X_t, y_t = train[features].iloc[train_idx], train['target'].iloc[train_idx]
-        X_v, y_v = train[features].iloc[valid_idx], train['target'].iloc[valid_idx]
-        
-        model = lgb.LGBMRegressor(**lgb_params)
-        model.fit(
-            X_t, y_t,
-            eval_set=[(X_v, y_v)],
-            callbacks=[lgb.early_stopping(stopping_rounds=50, verbose=False)]
-        )
-        
-        # Calculate validation score for this fold
-        fold_preds = model.predict(X_v)
-        fold_rmse = root_mean_squared_error(y_v, fold_preds)
-        oof_rmse_scores.append(fold_rmse)
-        print(f"Fold {fold+1} RMSE: {fold_rmse:.4f}")
-        
-        # Accumulate predictions for the test set
-        test_preds += model.predict(test[features]) / gkf.n_splits
-        
-    print(f"\nAverage Out-of-Time Validation RMSE: {np.mean(oof_rmse_scores):.4f}")
-    
-    print("\n5. Generating Final Submission...")
-    test['Target_pred'] = test_preds
-    
-    if 'ID' in sub.columns:
-        sub_id_col = 'ID'
-    else:
-        sub_id_col = sub.columns[0]
-        
-    if 'ID' in test.columns:
-        test_id_col = 'ID'
-    else:
-        test_id_col = test.columns[0]
-        
-    sub_mapped = sub[[sub_id_col]].copy()
-    sub_mapped = sub_mapped.merge(test[[test_id_col, 'Target_pred']], left_on=sub_id_col, right_on=test_id_col, how='left')
-    sub['Target'] = sub_mapped['Target_pred'].values
-    
-    out_path = "submission_advanced_pipeline.csv"
-    sub.to_csv(out_path, index=False)
-    print(f"Done! Saved to '{out_path}'")
+# ---------------------------------------------------------
+# 1. Config & Data Loading
+# ---------------------------------------------------------
+TRAIN_PATH = "Train (1).csv"
+TEST_PATH = "Test.csv"
+SUB_PATH = "SampleSubmission.csv"
+OUT_PATH = "submission.csv"
 
-if __name__ == "__main__":
-    main()
+print("Loading data...")
+train = pd.read_csv(TRAIN_PATH)
+test = pd.read_csv(TEST_PATH)
+sub = pd.read_csv(SUB_PATH)
+
+# ---------------------------------------------------------
+# 2. Data Cleaning & Preprocessing
+# ---------------------------------------------------------
+print("Preprocessing time and handling missing values...")
+train['time'] = pd.to_datetime(train['time'])
+test['time'] = pd.to_datetime(test['time'])
+
+# Target grouping for GroupKFold (Year_Month)
+train['year_month'] = train['time'].dt.year.astype(str) + '_' + train['time'].dt.month.astype(str)
+
+# Spatial forward fill for missing targets in test
+test = test.sort_values(by=['lat', 'lon', 'time'])
+test['TWS_t'] = test.groupby(['lat', 'lon'])['TWS_t'].ffill().fillna(0)
+
+# ---------------------------------------------------------
+# 3. Feature Engineering
+# ---------------------------------------------------------
+print("Engineering features...")
+for df in [train, test]:
+    df['month'] = df['time'].dt.month
+    df['drought_momentum_1_3'] = df['SPEI_01_t'] - df['SPEI_03_t']
+    df['water_soil_diff'] = df['TWS_t'] - df['SOIL_MOISTURE_t']
+
+features = [
+    'lat', 'lon', 'month',
+    'TWS_t', 'SOIL_MOISTURE_t',
+    'SPEI_01_t', 'SPEI_03_t', 'SPEI_06_t', 'SPEI_12_t',
+    'drought_momentum_1_3', 'water_soil_diff'
+]
+
+# ---------------------------------------------------------
+# 4. Modeling & Validation
+# ---------------------------------------------------------
+print("Training model with GroupKFold...")
+gkf = GroupKFold(n_splits=5)
+
+lgb_params = {
+    'objective': 'regression',
+    'metric': 'rmse',
+    'learning_rate': 0.05,
+    'n_estimators': 800,
+    'max_depth': 8,
+    'num_leaves': 64,
+    'subsample': 0.8,
+    'colsample_bytree': 0.8,
+    'random_state': 42,
+    'n_jobs': -1
+}
+
+test_preds = np.zeros(len(test))
+oof_scores = []
+
+for fold, (train_idx, valid_idx) in enumerate(gkf.split(train, train['target'], train['year_month'])):
+    X_t, y_t = train[features].iloc[train_idx], train['target'].iloc[train_idx]
+    X_v, y_v = train[features].iloc[valid_idx], train['target'].iloc[valid_idx]
+    
+    model = lgb.LGBMRegressor(**lgb_params)
+    model.fit(
+        X_t, y_t,
+        eval_set=[(X_v, y_v)],
+        callbacks=[lgb.early_stopping(stopping_rounds=50, verbose=False)]
+    )
+    
+    fold_preds = model.predict(X_v)
+    fold_rmse = root_mean_squared_error(y_v, fold_preds)
+    oof_scores.append(fold_rmse)
+    print(f"Fold {fold+1} RMSE: {fold_rmse:.4f}")
+
+print(f"\nMean CV RMSE: {np.mean(oof_scores):.4f}")
+
+# ---------------------------------------------------------
+# 5. Submission
+# ---------------------------------------------------------
+print("Preparing submission...")
+test['Target_pred'] = test_preds / gkf.n_splits
+
+id_col = 'ID' if 'ID' in sub.columns else sub.columns[0]
+test_id_col = 'ID' if 'ID' in test.columns else test.columns[0]
+
+sub_mapped = sub[[id_col]].merge(test[[test_id_col, 'Target_pred']], left_on=id_col, right_on=test_id_col, how='left')
+sub['Target'] = sub_mapped['Target_pred'].values
+
+sub.to_csv(OUT_PATH, index=False)
+print(f"Saved to {OUT_PATH}")
