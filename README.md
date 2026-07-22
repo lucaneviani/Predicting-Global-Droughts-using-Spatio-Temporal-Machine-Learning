@@ -1,7 +1,7 @@
 # Spatio-Temporal Machine Learning for Global Drought Forecasting
 
 ## Overview
-This project was developed for a global data science challenge organized by ITU and the UN. The business objective is critical: to forecast the Earth's **Total Water Storage** (how much water is stored above and below ground) one month into the future. 
+This project was developed for the A Step Ahead of Drought: Forecasting Global Water Storage Challenge https://zindi.africa/competitions/one-step-ahead-of-drought-forecasting-global-water-storage-challenge hosted on Zindi, in partnership with the ITU and the UN. The business objective is critical: to forecast the Earth's **Total Water Storage** (how much water is stored above and below ground) one month into the future. 
 
 Early detection of water depletion allows governments and organizations to proactively manage drought crises before they cause severe socio-economic damage. As a Data Scientist, my goal was to process satellite and climate data to build a highly robust, production-ready Machine Learning forecasting pipeline.
 
