@@ -1,36 +1,209 @@
-# Spatio-Temporal Machine Learning for Global Drought Forecasting
+<div align="center">
 
-## Overview
-This project was developed for the A Step Ahead of Drought: Forecasting Global Water Storage Challenge https://zindi.africa/competitions/one-step-ahead-of-drought-forecasting-global-water-storage-challenge hosted on Zindi, in partnership with the ITU and the UN. The business objective is critical: to forecast the Earth's **Total Water Storage** (how much water is stored above and below ground) one month into the future. 
+<img src="banner.jpg" alt="Spatio-Temporal Machine Learning Banner" width="100%"/>
 
-Early detection of water depletion allows governments and organizations to proactively manage drought crises before they cause severe socio-economic damage. As a Data Scientist, my goal was to process satellite and climate data to build a highly robust, production-ready Machine Learning forecasting pipeline.
+# 🌍 Spatio-Temporal Machine Learning  
+## Global Drought Forecasting
 
-## The Challenge & The Data
-The dataset contains over 2.4 million geospatial-temporal records. Instead of viewing this simply as a table of numbers, it's important to understand the physical reality it represents:
-- **Spatial Data:** Geographic coordinates mapping the entire globe.
-- **Water Storage:** The current amount of water in a specific location (the target we want to predict for the future).
-- **Climate Indicators:** Indexes measuring historical precipitation and surface soil moisture over various timeframes (e.g., the last month, the last 6 months).
+**A Step Ahead of Drought: Forecasting Global Water Storage Challenge**  
+*Zindi Competition hosted in partnership with ITU and the United Nations*
 
-## Methodology: 
-When building models for time-series forecasting, especially those involving geographic data, standard techniques often fail due to data leakage or a lack of physical context. Here is the strategic approach that I applied to this project:
+<br>
 
-### 1. Handling Real-World Missing Data
-In production environments, sensor data is frequently missing or delayed. During my Exploratory Data Analysis, I identified significant gaps in the most recent water storage readings.
-- **The Solution:** Instead of naive imputations (like replacing missing values with an average), I implemented a **Spatio-Temporal Forward Fill**. By grouping the data by exact geographic coordinates and sorting chronologically, I propagated the last known valid water level forward. This respects the laws of physics: large bodies of water and deep soil moisture deplete gradually over time, not instantly.
+<img src="https://img.shields.io/badge/Python-111111?style=for-the-badge&logo=python&logoColor=white"/>
+<img src="https://img.shields.io/badge/LightGBM-111111?style=for-the-badge"/>
+<img src="https://img.shields.io/badge/Geospatial%20ML-111111?style=for-the-badge&logo=googleearth&logoColor=white"/>
+<img src="https://img.shields.io/badge/Time%20Series-111111?style=for-the-badge"/>
 
-### 2. Contextual Feature Engineering
-Machine Learning models learn better when domain knowledge is translated into explicit features. Rather than feeding raw data blindly, I engineered features to provide context:
-- **Drought Momentum:** By subtracting long-term precipitation trends from short-term precipitation trends, I created a feature that measures "momentum." This tells the model not just how dry an area is, but *whether it is actively getting drier or recovering*.
-- **Surface vs. Groundwater Interaction:** By calculating the difference between total water storage and surface soil moisture, the model can better estimate deep groundwater reserves, a critical factor for long-term drought resilience.
-- **Seasonality:** Extracted the specific month from the timestamps to allow the model to recognize annual cycles (e.g., monsoon seasons vs. dry seasons).
+<br><br>
 
-### 3. Out-of-Time Validation Strategy (Preventing Data Leakage)
-A common mistake is using a random split (e.g., 80/20) for time-series data. This causes "data leakage" because the model might learn from the future to predict the past.
-- **The Solution:** I implemented an **Out-of-Time Cross-Validation (GroupKFold)**. I grouped the dataset by the temporal dimension (`Year-Month`). In every training fold, an entire month of data is held out completely. This forces the model to prove it can genuinely predict the future, perfectly simulating the real-world deployment scenario.
+<a href="https://zindi.africa/competitions/one-step-ahead-of-drought-forecasting-global-water-storage-challenge">
+<b>View Competition on Zindi ↗</b>
+</a>
 
-### 4. Algorithm Selection: LightGBM
-For the predictive engine, I utilized a **Gradient Boosting Machine (LightGBM)**.
-- **Why LightGBM?** It was specifically chosen because it offers the optimal trade-off between high predictive power and computational efficiency. It trains exponentially faster than deep neural networks while consuming a fraction of the memory, making it the perfect choice for processing tabular datasets with millions of rows Furthermore, tree-based models naturally partition spatial coordinates (Latitude and Longitude) to form an internal "rough map" of the world, identifying region-specific climate behaviors (e.g., the Sahara vs. the Amazon) without requiring complex spatial transformations.
+</div>
 
-## Results & Impact
-This approach achieved an Out-of-Time Validation RMSE of 0.52, while a score of 0.72 on the public leaderboard of the competition. To put this into context, standard baseline models typically score around 0.80, while the competition's top public leaderboard benchmark hovers around 0.65. By outperforming the standard baseline and securing a competitive score close to the top tier, this pipeline proves its value. It achieves these results purely through smart validation and domain-specific feature engineering rather than convoluted ensembles, making it highly reliable, easy to explain, and fully ready for real-world deployment.
+
+---
+
+# 🎯 Objective
+
+The goal of this project was to forecast **Global Total Water Storage (TWS)** one month ahead using satellite-derived geospatial and climate data.
+
+Accurate drought forecasting enables governments and organizations to identify early water depletion patterns and take preventive actions before severe socio-economic impacts occur.
+
+
+---
+
+# 🌍 Dataset Overview
+
+The dataset contains more than **2.4 million spatio-temporal observations** covering the entire globe.
+
+| Data Component | Description |
+|---|---|
+| 📍 Spatial Information | Latitude and longitude coordinates representing global locations |
+| 💧 Total Water Storage | Target variable representing surface and groundwater availability |
+| 🌧 Climate Indicators | Historical precipitation and soil moisture indexes across different time windows |
+| 📅 Temporal Features | Monthly observations capturing seasonal and long-term climate patterns |
+
+
+---
+
+# 🏗️ Machine Learning Pipeline
+
+The main challenge was combining **geographical information** with **time-dependent forecasting** while avoiding future information leakage.
+
+
+```mermaid
+flowchart LR
+
+A[Satellite & Climate Data<br>2.4M+ Records]
+--> B[Spatio-Temporal Missing Data Handling]
+
+B --> C[Domain-Based Feature Engineering]
+
+C --> D[Out-of-Time Validation<br>Grouped by Year-Month]
+
+D --> E[LightGBM Model]
+
+E --> F[Global Water Storage Forecast]
+
+
+style E fill:#2563EB,color:#ffffff
+```
+
+---
+
+# 🔧 Methodology
+
+## 1. Spatio-Temporal Missing Data Handling
+
+Real-world satellite datasets often contain missing measurements due to sensor limitations.
+
+To address this issue, I implemented a **spatio-temporal forward fill strategy**:
+
+- Data was grouped by exact geographic coordinates.
+- Observations were sorted chronologically.
+- Missing values were replaced using the latest available measurement.
+
+This approach respects the physical behavior of water systems, where storage levels typically change gradually rather than randomly.
+
+
+---
+
+## 2. Domain-Specific Feature Engineering
+
+Instead of relying only on raw measurements, additional features were created to capture drought dynamics.
+
+
+### 📉 Drought Momentum
+
+Measures whether a region is becoming progressively drier:
+
+```
+Short-term precipitation trend - Long-term precipitation trend
+```
+
+
+### 💧 Surface vs Groundwater Interaction
+
+Estimated groundwater variation by comparing:
+
+```
+Total Water Storage - Surface Soil Moisture
+```
+
+
+### 📅 Seasonality
+
+Extracted temporal patterns:
+
+- Month
+- Seasonal cycles
+- Regional climate behavior
+
+
+---
+
+# 🧪 Validation Strategy
+
+## Preventing Time-Series Leakage
+
+A traditional random train/test split would allow the model to learn information from the future.
+
+Instead, I implemented **Out-of-Time Cross Validation**:
+
+- Data grouped by `Year-Month`
+- Entire months held out during validation
+- Model evaluated on unseen future periods
+
+
+This better simulates real-world deployment where future water storage values are unknown.
+
+
+---
+
+# 🤖 Model Selection
+
+## LightGBM Gradient Boosting
+
+LightGBM was selected because it provides an excellent balance between:
+
+✅ Predictive performance  
+✅ Training speed  
+✅ Memory efficiency  
+✅ Ability to model nonlinear relationships
+
+
+Tree-based models can naturally learn interactions between:
+
+- Latitude / Longitude
+- Climate conditions
+- Seasonal patterns
+- Regional drought behavior
+
+
+without requiring complex spatial transformations.
+
+
+---
+
+# 📊 Results
+
+| Evaluation | RMSE | Description |
+|---|---:|---|
+| Out-of-Time Validation | **0.52** | Realistic simulation of future forecasting performance |
+| Public Leaderboard | **0.72** | Competitive Zindi benchmark score |
+
+The final solution achieved a strong competitive performance by combining:
+
+- robust temporal validation
+- domain-driven feature engineering
+- efficient gradient boosting modeling
+
+
+---
+
+# 🛠️ Tech Stack
+
+| Category | Tools |
+|---|---|
+| Language | Python |
+| Machine Learning | LightGBM |
+| Data Processing | Pandas, NumPy |
+| Geospatial Analysis | GeoPandas, Satellite Data |
+| Validation | Time-based Cross Validation |
+| Competition Platform | Zindi |
+
+
+---
+
+# 📌 Key Takeaways
+
+This project demonstrates how traditional machine learning models can effectively solve complex geospatial forecasting problems when combined with:
+
+- correct validation strategies
+- domain knowledge
+- physically meaningful feature engineering
+
+The main lesson: **better data understanding often matters more than model complexity.**
